@@ -1,5 +1,6 @@
 from scipy.io import loadmat
 from scipy import ndimage
+from scipy.ndimage import gaussian_filter
 import cv2, os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -44,11 +45,29 @@ def computeTextureReprs(image, F):
     for i in range(F.shape[2]):
         texture_repr_mean.append(np.mean(responses[i]))
     return texture_repr_concat, texture_repr_mean
-    # cv2.imshow('image', img2)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
-i = loadImages()
-computeTextureReprs(cv2.imread(os.path.abspath(os.path.join(i.imagesPath,i.myImages[0]))),loadmat(os.path.join(i.filters,"leung_malik_filter.mat"))["F"])
 
-# if __name__ == "__main__":
-    # part1()
+def part3(im1, im2):
+    img1 = cv2.imread(im1,0)
+    img1 = cv2.resize(img1, (512, 512))
+    img2 = cv2.imread(im2,0)
+    img2 = cv2.resize(img2, (512, 512))
+    im1_blur = gaussian_filter(img1, sigma=20)
+    im2_blur = gaussian_filter(img2, sigma=1)
+    im2_detail = img2 - im2_blur
+    hybrid = im1_blur + im2_detail
+    cv2.imshow('image', hybrid)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+def extract_keypoints(img):
+    image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    k = 0.05
+    dx, dy = np.gradient(image)
+    R = np.zeros((image.shape[0], image.shape[1]))
+    
+
+if __name__ == "__main__":
+    i = loadImages()
+    extract_keypoints(cv2.imread(os.path.abspath(os.path.join(i.imagesPath,i.myImages[0]))))
+    # part3(os.path.abspath(os.path.join(i.imagesPath, i.myImages[0])), os.path.abspath(os.path.join(i.imagesPath, i.myImages[1])))
+    # computeTextureReprs(cv2.imread(os.path.abspath(os.path.join(i.imagesPath,i.myImages[0]))),loadmat(os.path.join(i.filters,"leung_malik_filter.mat"))["F"])
