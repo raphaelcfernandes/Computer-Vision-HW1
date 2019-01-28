@@ -61,10 +61,16 @@ def part3(im1, im2):
 
 def extract_keypoints(img):
     image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    pixel_offset = 2
     k = 0.05
+    window_size = 5
     dx, dy = np.gradient(image)
     R = np.zeros((image.shape[0], image.shape[1]))
-    
+    Ixx = dx ** 2
+    Iyy = dy ** 2
+    Ixy = dx * dy
+
+
 
 if __name__ == "__main__":
     i = loadImages()
