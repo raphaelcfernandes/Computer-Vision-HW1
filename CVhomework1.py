@@ -69,6 +69,15 @@ def extract_keypoints(img):
     Ixx = dx ** 2
     Iyy = dy ** 2
     Ixy = dx * dy
+    #OpenCV loads height X width. Y x X
+    #The foor loop should iterate over Y then over X
+    #Det 2x2: (A11 * A22) - (A12 * A21)
+    #Trace of a NxN matrix: sum of all elements in the main diagonal
+    for y in range(pixel_offset, image.shape[0] - pixel_offset):
+        for x in range(pixel_offset, image.shape[1] - pixel_offset):
+            windowIxx = Ixx[y-pixel_offset:y+pixel_offset+1, x-pixel_offset:x+pixel_offset+1]
+    print(windowIxx)
+    print(Ixx)
 
 
 
@@ -77,3 +86,4 @@ if __name__ == "__main__":
     extract_keypoints(cv2.imread(os.path.abspath(os.path.join(i.imagesPath,i.myImages[0]))))
     # part3(os.path.abspath(os.path.join(i.imagesPath, i.myImages[0])), os.path.abspath(os.path.join(i.imagesPath, i.myImages[1])))
     # computeTextureReprs(cv2.imread(os.path.abspath(os.path.join(i.imagesPath,i.myImages[0]))),loadmat(os.path.join(i.filters,"leung_malik_filter.mat"))["F"])
+
