@@ -12,4 +12,3 @@ Part III
     5
 
 http://www.cse.psu.edu/~rtc12/CSE486/lecture06.pdf
-https://github.com/hughesj919/HarrisCorner/blob/master/Corners.py

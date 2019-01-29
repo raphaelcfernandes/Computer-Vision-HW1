@@ -1,11 +1,13 @@
 from scipy.io import loadmat
 from scipy import ndimage
 from scipy.ndimage import gaussian_filter
-import cv2, os
+import cv2
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from loadImages import loadImages
+from skimage.feature import corner_harris, corner_peaks
 
 
 def part1():
@@ -32,24 +34,27 @@ def part1():
     #     fig.savefig(os.path.abspath(os.path.join("part1_plots", name)))
     #     plt.close(fig)
 
+
 def computeTextureReprs(image, F):
     k = loadImages()
     img = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     img = cv2.resize(img, (100, 100))
     responses = np.ndarray(shape=(F.shape[2], img.shape[0], img.shape[1]))
     for i in range(F.shape[2]):
-        img2 = ndimage.convolve(img, F[:,:, i])
+        img2 = ndimage.convolve(img, F[:, :, i])
         responses[i] = img2
-    texture_repr_concat = responses.reshape(F.shape[2] * img.shape[0] * img.shape[1])
+    texture_repr_concat = responses.reshape(
+        F.shape[2] * img.shape[0] * img.shape[1])
     texture_repr_mean = []
     for i in range(F.shape[2]):
         texture_repr_mean.append(np.mean(responses[i]))
     return texture_repr_concat, texture_repr_mean
 
+
 def part3(im1, im2):
-    img1 = cv2.imread(im1,0)
+    img1 = cv2.imread(im1, 0)
     img1 = cv2.resize(img1, (512, 512))
-    img2 = cv2.imread(im2,0)
+    img2 = cv2.imread(im2, 0)
     img2 = cv2.resize(img2, (512, 512))
     im1_blur = gaussian_filter(img1, sigma=20)
     im2_blur = gaussian_filter(img2, sigma=1)
@@ -59,38 +64,29 @@ def part3(im1, im2):
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
+
 def extract_keypoints(img):
     k = 0.05
     window_size = 5
     image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    dx, dy = np.gradient(image)
+    dy, dx = np.gradient(image)
     Ixx = dx ** 2
     Iyy = dy ** 2
     Ixy = dx * dy
     R = np.zeros((image.shape[0], image.shape[1]))
-    #OpenCV loads height X width. Y x X
-    #The foor loop should iterate over Y then over X
-    #Det 2x2: (A11 * A22) - (A12 * A21)
-    #Trace of a NxN matrix: sum of all elements in the main diagonal
-    for i in range(image.shape[0]):
-        for j in range(image.shape[1]):
-            m = np.array()
-    # dst = cv2.cornerHarris(image,2,3,0.04)
-    # img[dst>0.01*dst.max()]=[255,100,200]
-    # cv2.imshow('image', img)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
-    # pixel_offset = int(window_size/2)
-    # threshold = 100000    
-    # SumXX = []
-    # SumXY = []
-    # SumYY = []
-
+    pixel_offset = int(window_size / 2)
+    # OpenCV loads height X width. Y x X
+    # The foor loop should iterate over Y then over X
+    # Det 2x2: (A11 * A22) - (A12 * A21)
+    # Trace of a NxN matrix: sum of all elements in the main diagonal
+    #R = det(M) - k(trace(M)^2)
+    for y in range(pixel_offset, image.shape[0] - pixel_offset):
+        for x in range(pixel_offset, image.shape[1] - pixel_offset):
 
 
 if __name__ == "__main__":
     i = loadImages()
-    extract_keypoints(cv2.imread(os.path.abspath(os.path.join(i.imagesPath,i.myImages[2]))))
+    extract_keypoints(cv2.imread(os.path.abspath(
+        os.path.join(i.imagesPath, i.myImages[4]))))
     # part3(os.path.abspath(os.path.join(i.imagesPath, i.myImages[0])), os.path.abspath(os.path.join(i.imagesPath, i.myImages[1])))
     # computeTextureReprs(cv2.imread(os.path.abspath(os.path.join(i.imagesPath,i.myImages[0]))),loadmat(os.path.join(i.filters,"leung_malik_filter.mat"))["F"])
-
