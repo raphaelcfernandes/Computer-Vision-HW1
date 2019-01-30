@@ -7,7 +7,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from loadImages import loadImages
-from skimage.feature import corner_harris, corner_peaks
 
 
 def part1():
@@ -78,10 +77,10 @@ def extract_keypoints(img):
     k = 0.05
     window_size = 5
     image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    dy, dx = np.gradient(image)
-    Ixx = dx ** 2
-    Iyy = dy ** 2
-    Ixy = dx * dy
+    dx = cv2.Sobel(image,cv2.CV_64F,1,0)
+    dy = cv2.Sobel(image,cv2.CV_64F,0,1)
+    Ixx = dx**2
+    Iyy = dy**2
     R = np.zeros((image.shape[0], image.shape[1]))
     pixel_offset = int(window_size / 2)
     # OpenCV loads height X width. Y x X
@@ -89,34 +88,27 @@ def extract_keypoints(img):
     # Det 2x2: (A11 * A22) - (A12 * A21)
     # Trace of a NxN matrix: sum of all elements in the main diagonal
     # R = det(M) - k(trace(M)^2)
-    for y in range(pixel_offset, image.shape[0] - pixel_offset):
-        for x in range(pixel_offset, image.shape[1] - pixel_offset):
+    for y in range(2, image.shape[0] - 2):
+        for x in range(2, image.shape[1] - 2):
             M = np.zeros((2, 2))
-            M[0, 0] = np.sum(
-                Ixx[y - pixel_offset:y + pixel_offset, x - pixel_offset:x + pixel_offset])
-            M[0, 1] = M[1, 0] = np.sum(
-                Ixy[y - pixel_offset:y + pixel_offset, x - pixel_offset:x + pixel_offset])
-            M[1, 1] = np.sum(
-                Iyy[y - pixel_offset:y + pixel_offset, x - pixel_offset:x +
-                    pixel_offset])
+            M[0, 0] = np.sum(Ixx[y - pixel_offset:y + pixel_offset+1, x - pixel_offset:x + pixel_offset+1])
+            M[0, 1] = np.sum(dx[y - pixel_offset:y + pixel_offset+1, x - pixel_offset:x + pixel_offset+1]*dy[y - pixel_offset:y + pixel_offset+1, x - pixel_offset:x + pixel_offset+1])
+            M[1, 0] = M[0,1]
+            M[1, 1] = np.sum(Iyy[y - pixel_offset:y + pixel_offset+1, x - pixel_offset:x +pixel_offset+1])
+            R[y, x] = (np.linalg.det(M)) - k*(np.trace(M)**2)
+    threshold = 5*abs(np.mean(R))
+    #Non-max supression
+    # for y in range(1,image.shape[0]-1):
+    #     for x in range(1,image.shape[1]-1):
+    #         if R[y,x] < threshold:
+    #             R[y, x] = 0
 
-            lambda2, lambda1 = np.linalg.eig(M)
-            # res = lambda1 * lambda2 - k * ((lambda1 + lambda2)**2)
-            # score = np.linalg.det(res) - k * (np.trace(res)**2)
-            score = lambda2[0] * lambda2[1] - \
-                k * ((lambda2[0] + lambda2[1])**2)
-            R[y, x] = score
-    threshold = np.mean(R)
-    # Non-max supression
-    for y in range(image.shape[0]):
-        for x in range(image.shape[1]):
-            if y - 1 >= 0 and y + 1 < R.shape[0] and x - 1 >= 0 and x + 1 < R.shape[1] and R[y, x] > threshold:
-                if check(R, y, x):
-                    img.itemset((y, x, 0), 0)
-                    img.itemset((y, x, 1), 0)
-                    img.itemset((y, x, 2), 255)
-                    continue
-            R[y, x] = 0
+    for y in range(1,image.shape[0]-1):
+        for x in range(1,image.shape[1]-1):
+            if R[y,x] > threshold:
+                img.itemset((y, x, 0), 0)
+                img.itemset((y, x, 1), 255)
+                img.itemset((y, x, 2), 0)
 
     cv2.imshow('image', img)
     cv2.waitKey(0)
@@ -126,6 +118,6 @@ def extract_keypoints(img):
 if __name__ == "__main__":
     i = loadImages()
     extract_keypoints(cv2.imread(os.path.abspath(
-        os.path.join(i.imagesPath, i.myImages[0]))))
+        os.path.join(i.imagesPath, i.myImages[2]))))
     # part3(os.path.abspath(os.path.join(i.imagesPath, i.myImages[0])), os.path.abspath(os.path.join(i.imagesPath, i.myImages[1])))
     # computeTextureReprs(cv2.imread(os.path.abspath(os.path.join(i.imagesPath,i.myImages[0]))),loadmat(os.path.join(i.filters,"leung_malik_filter.mat"))["F"])
