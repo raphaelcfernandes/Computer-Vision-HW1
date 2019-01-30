@@ -65,6 +65,15 @@ def part3(im1, im2):
     cv2.destroyAllWindows()
 
 
+def check(R, y, x):
+    if R[y, x] > R[y - 1, x - 1] and R[y, x] > R[y - 1, x] \
+            and R[y, x] > R[y - 1, x + 1] and R[y, x] > R[y, x - 1] and R[y, x] > R[y, x + 1] \
+            and R[y, x] > R[y + 1, x - 1] and R[y, x] > R[y + 1, x] and R[y, x] > R[y + 1, x + 1]:
+        return True
+
+    return False
+
+
 def extract_keypoints(img):
     k = 0.05
     window_size = 5
@@ -79,14 +88,44 @@ def extract_keypoints(img):
     # The foor loop should iterate over Y then over X
     # Det 2x2: (A11 * A22) - (A12 * A21)
     # Trace of a NxN matrix: sum of all elements in the main diagonal
-    #R = det(M) - k(trace(M)^2)
+    # R = det(M) - k(trace(M)^2)
     for y in range(pixel_offset, image.shape[0] - pixel_offset):
         for x in range(pixel_offset, image.shape[1] - pixel_offset):
+            M = np.zeros((2, 2))
+            M[0, 0] = np.sum(
+                Ixx[y - pixel_offset:y + pixel_offset, x - pixel_offset:x + pixel_offset])
+            M[0, 1] = M[1, 0] = np.sum(
+                Ixy[y - pixel_offset:y + pixel_offset, x - pixel_offset:x + pixel_offset])
+            M[1, 1] = np.sum(
+                Iyy[y - pixel_offset:y + pixel_offset, x - pixel_offset:x +
+                    pixel_offset])
+
+            lambda2, lambda1 = np.linalg.eig(M)
+            # res = lambda1 * lambda2 - k * ((lambda1 + lambda2)**2)
+            # score = np.linalg.det(res) - k * (np.trace(res)**2)
+            score = lambda2[0] * lambda2[1] - \
+                k * ((lambda2[0] + lambda2[1])**2)
+            R[y, x] = score
+    threshold = np.mean(R)
+    # Non-max supression
+    for y in range(image.shape[0]):
+        for x in range(image.shape[1]):
+            if y - 1 >= 0 and y + 1 < R.shape[0] and x - 1 >= 0 and x + 1 < R.shape[1] and R[y, x] > threshold:
+                if check(R, y, x):
+                    img.itemset((y, x, 0), 0)
+                    img.itemset((y, x, 1), 0)
+                    img.itemset((y, x, 2), 255)
+                    continue
+            R[y, x] = 0
+
+    cv2.imshow('image', img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
     i = loadImages()
     extract_keypoints(cv2.imread(os.path.abspath(
-        os.path.join(i.imagesPath, i.myImages[4]))))
+        os.path.join(i.imagesPath, i.myImages[0]))))
     # part3(os.path.abspath(os.path.join(i.imagesPath, i.myImages[0])), os.path.abspath(os.path.join(i.imagesPath, i.myImages[1])))
     # computeTextureReprs(cv2.imread(os.path.abspath(os.path.join(i.imagesPath,i.myImages[0]))),loadmat(os.path.join(i.filters,"leung_malik_filter.mat"))["F"])
