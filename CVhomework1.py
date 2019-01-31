@@ -7,31 +7,40 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from loadImages import loadImages
+from operator import itemgetter
 
 
 def part1():
+    loadI = loadImages()
+    leung_malik = loadmat(os.path.join(
+        loadI.filters, "leung_malik_filter.mat"))["F"]
     if not os.path.exists("part1_plots"):
         os.mkdir("part1_plots")
-    # for i in range(48):
-    #     fig, axs = plt.subplots(2, 4)
-    #     axs[0, 1].axis("off")
-    #     axs[0, 0].imshow(leung_malik[:,:, i])
-    #     axs[0, 0].set_title("Filter")
-    #     axs[0, 2].imshow(ndimage.convolve(myImages[0],leung_malik[:,:,i]))
-    #     axs[0, 2].set_title(images[0])
-    #     axs[0, 3].imshow(ndimage.convolve(myImages[1],leung_malik[:,:,i]))
-    #     axs[0, 3].set_title(images[1])
-    #     axs[1, 0].imshow(ndimage.convolve(myImages[2],leung_malik[:,:,i]))
-    #     axs[1, 0].set_title(images[2])
-    #     axs[1, 1].imshow(ndimage.convolve(myImages[3],leung_malik[:,:,i]))
-    #     axs[1, 1].set_title(images[3])
-    #     axs[1, 2].imshow(ndimage.convolve(myImages[4],leung_malik[:,:,i]))
-    #     axs[1, 2].set_title(images[4])
-    #     axs[1, 3].imshow(ndimage.convolve(myImages[5],leung_malik[:,:,i]))
-    #     axs[1, 3].set_title(images[5])
-    #     name = 'plot_filter_'+str(i)+'.png'
-    #     fig.savefig(os.path.abspath(os.path.join("part1_plots", name)))
-    #     plt.close(fig)
+    myImages = []
+    for i in loadI.imagesVector:
+        img = cv2.imread(os.path.join(loadI.imagesPath, i), 0)
+        img = cv2.resize(img, (100, 100))
+        myImages.append(img)
+    for i in range(48):
+        fig, axs = plt.subplots(2, 4)
+        axs[0, 1].axis("off")
+        axs[0, 0].imshow(leung_malik[:, :, i])
+        axs[0, 0].set_title("Filter")
+        axs[0, 2].imshow(ndimage.convolve(myImages[0], leung_malik[:, :, i]))
+        axs[0, 2].set_title(loadI.imagesVector[0])
+        axs[0, 3].imshow(ndimage.convolve(myImages[1], leung_malik[:, :, i]))
+        axs[0, 3].set_title(loadI.imagesVector[1])
+        axs[1, 0].imshow(ndimage.convolve(myImages[2], leung_malik[:, :, i]))
+        axs[1, 0].set_title(loadI.imagesVector[2])
+        axs[1, 1].imshow(ndimage.convolve(myImages[3], leung_malik[:, :, i]))
+        axs[1, 1].set_title(loadI.imagesVector[3])
+        axs[1, 2].imshow(ndimage.convolve(myImages[4], leung_malik[:, :, i]))
+        axs[1, 2].set_title(loadI.imagesVector[4])
+        axs[1, 3].imshow(ndimage.convolve(myImages[5], leung_malik[:, :, i]))
+        axs[1, 3].set_title(loadI.imagesVector[5])
+        name = 'plot_filter_' + str(i) + '.png'
+        fig.savefig(os.path.abspath(os.path.join("part1_plots", name)))
+        plt.close(fig)
 
 
 def computeTextureReprs(image, F):
@@ -62,6 +71,9 @@ def part3(im1, im2):
     cv2.imshow('image', hybrid)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+    name = 'hybrid' + '.png'
+    cv2.imwrite(os.path.abspath(os.path.join(os.path.join(
+        "images", "images_for_hybridazation"), name)), hybrid)
 
 
 def check(R, y, x):
@@ -77,47 +89,64 @@ def extract_keypoints(img):
     k = 0.05
     window_size = 5
     image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    dx = cv2.Sobel(image,cv2.CV_64F,1,0)
-    dy = cv2.Sobel(image,cv2.CV_64F,0,1)
+    dx = cv2.Sobel(image, cv2.CV_64F, 1, 0)
+    dy = cv2.Sobel(image, cv2.CV_64F, 0, 1)
     Ixx = dx**2
     Iyy = dy**2
     R = np.zeros((image.shape[0], image.shape[1]))
     pixel_offset = int(window_size / 2)
+    location_points = []
+    scores = []
     # OpenCV loads height X width. Y x X
     # The foor loop should iterate over Y then over X
     # Det 2x2: (A11 * A22) - (A12 * A21)
     # Trace of a NxN matrix: sum of all elements in the main diagonal
     # R = det(M) - k(trace(M)^2)
-    for y in range(2, image.shape[0] - 2):
-        for x in range(2, image.shape[1] - 2):
+    for y in range(pixel_offset, image.shape[0] - pixel_offset):
+        for x in range(pixel_offset, image.shape[1] - pixel_offset):
             M = np.zeros((2, 2))
-            M[0, 0] = np.sum(Ixx[y - pixel_offset:y + pixel_offset+1, x - pixel_offset:x + pixel_offset+1])
-            M[0, 1] = np.sum(dx[y - pixel_offset:y + pixel_offset+1, x - pixel_offset:x + pixel_offset+1]*dy[y - pixel_offset:y + pixel_offset+1, x - pixel_offset:x + pixel_offset+1])
-            M[1, 0] = M[0,1]
-            M[1, 1] = np.sum(Iyy[y - pixel_offset:y + pixel_offset+1, x - pixel_offset:x +pixel_offset+1])
-            R[y, x] = (np.linalg.det(M)) - k*(np.trace(M)**2)
-    threshold = 5*abs(np.mean(R))
-    #Non-max supression
-    # for y in range(1,image.shape[0]-1):
-    #     for x in range(1,image.shape[1]-1):
-    #         if R[y,x] < threshold:
-    #             R[y, x] = 0
-
-    for y in range(1,image.shape[0]-1):
-        for x in range(1,image.shape[1]-1):
-            if R[y,x] > threshold:
-                img.itemset((y, x, 0), 0)
-                img.itemset((y, x, 1), 255)
+            M[0, 0] = np.sum(Ixx[y - pixel_offset:y + pixel_offset +
+                                 1, x - pixel_offset:x + pixel_offset + 1])
+            M[0, 1] = np.sum(dx[y - pixel_offset:y + pixel_offset + 1, x - pixel_offset:x + pixel_offset + 1]
+                             * dy[y - pixel_offset:y + pixel_offset + 1, x - pixel_offset:x + pixel_offset + 1])
+            M[1, 0] = M[0, 1]
+            M[1, 1] = np.sum(Iyy[y - pixel_offset:y + pixel_offset +
+                                 1, x - pixel_offset:x + pixel_offset + 1])
+            R[y, x] = (np.linalg.det(M)) - k * (np.trace(M)**2)
+    threshold = 0.01 * abs(R.max())
+    # Thresholding pixels
+    R[R < threshold] = 0
+    # Non-max suppresion
+    for y in range(1, image.shape[0] - 1):
+        for x in range(1, image.shape[1] - 1):
+            if check(R, y, x):
+                location_points.append((y, x))
+                scores.append((R[y, x], (y, x)))
+                img.itemset((y, x, 0), 255)
+                img.itemset((y, x, 1), 0)
                 img.itemset((y, x, 2), 0)
-
+    sortedScores = sorted(scores, key=itemgetter(0))
+    r = 1
+    for i in sortedScores:
+        cv2.circle(img, (i[1][1], i[1][0]), r, (0, 0, 255))
+        r += 1
     cv2.imshow('image', img)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+    return location_points, scores, Ixx, Iyy
 
+
+def compute_features(location_points, scores, Ixx, Iyy):
+    loadClass = loadImages()
+    clusters = loadmat(os.path.join(loadClass.clusters, "means.mat"))["means"]
+    print(clusters)
 
 if __name__ == "__main__":
     i = loadImages()
-    extract_keypoints(cv2.imread(os.path.abspath(
-        os.path.join(i.imagesPath, i.myImages[2]))))
-    # part3(os.path.abspath(os.path.join(i.imagesPath, i.myImages[0])), os.path.abspath(os.path.join(i.imagesPath, i.myImages[1])))
+    print(i.imagesHybridazationVector)
+    # extract_keypoints(cv2.imread(os.path.abspath(
+    # os.path.join(i.imagesPath, i.imagesVector[5]))))
+    # compute_features([[]], [], [], [])
+    part3(os.path.abspath(os.path.join(i.imagesPath, i.imagesVector[0])), os.path.abspath(
+        os.path.join(i.imagesPath, i.imagesVector[1])))
     # computeTextureReprs(cv2.imread(os.path.abspath(os.path.join(i.imagesPath,i.myImages[0]))),loadmat(os.path.join(i.filters,"leung_malik_filter.mat"))["F"])
