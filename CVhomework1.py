@@ -5,7 +5,6 @@ import cv2
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
 from loadImages import loadImages
 from operator import itemgetter
 
@@ -126,27 +125,35 @@ def extract_keypoints(img):
                 img.itemset((y, x, 1), 0)
                 img.itemset((y, x, 2), 0)
     sortedScores = sorted(scores, key=itemgetter(0))
-    r = 1
-    for i in sortedScores:
-        cv2.circle(img, (i[1][1], i[1][0]), r, (0, 0, 255))
-        r += 1
-    cv2.imshow('image', img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-    return location_points, scores, Ixx, Iyy
+    # r = 1
+    # for i in sortedScores:
+    #     cv2.circle(img, (i[1][1], i[1][0]), r, (0, 0, 255))
+    #     r += 1
+    # cv2.imshow('image', img)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+    return location_points, scores, dx, dy
 
 
-def compute_features(location_points, scores, Ixx, Iyy):
-    loadClass = loadImages()
-    clusters = loadmat(os.path.join(loadClass.clusters, "means.mat"))["means"]
-    print(clusters)
+def detectFeatureKeypoint(x, y, Xmax, Ymax):
+    if x - 5 > 0 and x + 5 < Xmax and y - 5 > 0 and y + 5 < Ymax:
+        return True
+    return False
+
+
+def compute_features(location_points, scores, Ixx, Iyy, image):
+    features = []
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    features = [(x, y) for x, y in location_points if detectFeatureKeypoint(
+        x, y, image.shape[0], image.shape[1])]
+    for f in features:
+        x, y = f
+        Mxy = np.sqrt()
+
 
 if __name__ == "__main__":
     i = loadImages()
-    print(i.imagesHybridazationVector)
-    # extract_keypoints(cv2.imread(os.path.abspath(
-    # os.path.join(i.imagesPath, i.imagesVector[5]))))
-    # compute_features([[]], [], [], [])
-    part3(os.path.abspath(os.path.join(i.imagesPath, i.imagesVector[0])), os.path.abspath(
-        os.path.join(i.imagesPath, i.imagesVector[1])))
-    # computeTextureReprs(cv2.imread(os.path.abspath(os.path.join(i.imagesPath,i.myImages[0]))),loadmat(os.path.join(i.filters,"leung_malik_filter.mat"))["F"])
+    location_points, scores, Ixx, Iyy = extract_keypoints(cv2.imread(
+        os.path.abspath(os.path.join(i.imagesHybridazation, i.imagesHybridazationVector[0]))))
+    compute_features(location_points, scores, Ixx, Iyy, cv2.imread(
+        os.path.abspath(os.path.join(i.imagesHybridazation, i.imagesHybridazationVector[0]))))
