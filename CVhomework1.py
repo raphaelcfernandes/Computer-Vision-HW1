@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from loadImages import loadImages
 from operator import itemgetter
-
+import math
 
 def part1():
     loadI = loadImages()
@@ -141,14 +141,23 @@ def detectFeatureKeypoint(x, y, Xmax, Ymax):
     return False
 
 
-def compute_features(location_points, scores, Ixx, Iyy, image):
+def compute_features(location_points, scores, Ix, Iy, image):
     features = []
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     features = [(x, y) for x, y in location_points if detectFeatureKeypoint(
         x, y, image.shape[0], image.shape[1])]
+    featureBin = {'bin1':[],'bin2':[],'bin3':[],'bin4':[],'bin5':[],'bin6':[],'bin7':[]}
     for f in features:
         x, y = f
-        Mxy = np.sqrt()
+        Mxy = np.sqrt((Ix[y-5:y+5+1,x-5:x+5+1]**2) + (Iy[y-5:y+5+1,x-5:x+5+1])**2)
+        theta = (Ix[y-5:y+5+1,x-5:x+5+1]) / (Iy[y-5:y+5+1,x-5:x+5+1])
+        print(theta.shape)
+        for i in range(theta.shape[0]):
+            for j in theta[i][:]:
+                res = math.atan(j)
+            break
+        break
+        
 
 
 if __name__ == "__main__":
