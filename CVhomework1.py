@@ -9,6 +9,7 @@ from loadImages import loadImages
 from operator import itemgetter
 import math
 
+
 def part1():
     loadI = loadImages()
     leung_malik = loadmat(os.path.join(
@@ -136,7 +137,7 @@ def extract_keypoints(img):
 
 
 def detectFeatureKeypoint(x, y, Xmax, Ymax):
-    if x - 5 > 0 and x + 5 < Xmax and y - 5 > 0 and y + 5 < Ymax:
+    if x - 5 >= 0 and x + 5 < Xmax and y - 5 >= 0 and y + 5 < Ymax:
         return True
     return False
 
@@ -144,25 +145,64 @@ def detectFeatureKeypoint(x, y, Xmax, Ymax):
 def compute_features(location_points, scores, Ix, Iy, image):
     features = []
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # (y,x)
     features = [(x, y) for x, y in location_points if detectFeatureKeypoint(
-        x, y, image.shape[0], image.shape[1])]
-    featureBin = {'bin1':[],'bin2':[],'bin3':[],'bin4':[],'bin5':[],'bin6':[],'bin7':[]}
+        y, x, image.shape[1], image.shape[0])]
+    featureBins = {'bin1': [], 'bin2': [], 'bin3': [],
+                   'bin4': [], 'bin5': [], 'bin6': [], 'bin7': [], 'bin8': []}
+    gradientMagnitude = {'bin1': 0, 'bin2': 0, 'bin3': 0,
+                         'bin4': 0, 'bin5': 0, 'bin6': 0, 'bin7': 0, 'bin8': 0}
     for f in features:
-        x, y = f
-        Mxy = np.sqrt((Ix[y-5:y+5+1,x-5:x+5+1]**2) + (Iy[y-5:y+5+1,x-5:x+5+1])**2)
-        theta = (Ix[y-5:y+5+1,x-5:x+5+1]) / (Iy[y-5:y+5+1,x-5:x+5+1])
-        print(theta.shape)
-        for i in range(theta.shape[0]):
-            for j in theta[i][:]:
-                res = math.atan(j)
-            break
-        break
-        
+        y, x = f
+        for i in range(-5, 6, 1):
+            for j in range(-5, 6, 1):
+                Mxy = np.sqrt(Ix[y + i, x + j + 1] ** 2 +
+                              Iy[y + i, x + j + 1] ** 2)
+                if not Iy[y + i, x + j + 1] == 0:
+                    k = math.degrees(
+                        math.atan(Ix[y + i, x + j + 1] / Iy[y + i, x + j + 1]))
+                else:
+                    k = 0
+                if k >= -90 and k < -67.5:
+                    featureBins.get('bin1').append(Mxy)
+                    gradientMagnitude['bin1'] += Mxy
+                elif k >= -67.5 and k < -45:
+                    featureBins.get('bin2').append(Mxy)
+                    gradientMagnitude['bin2'] += Mxy
+                elif k >= -45 and k < -22.5:
+                    featureBins.get('bin3').append(Mxy)
+                    gradientMagnitude['bin3'] += Mxy
+                elif k >= -22.5 and k < 0:
+                    featureBins.get('bin4').append(Mxy)
+                    gradientMagnitude['bin4'] += Mxy
+                elif k >= 0 and k < 22.5:
+                    featureBins.get('bin5').append(Mxy)
+                    gradientMagnitude['bin5'] += Mxy
+                elif k >= 22.5 and k < 45:
+                    featureBins.get('bin6').append(Mxy)
+                    gradientMagnitude['bin6'] += Mxy
+                elif k >= 45 and k < 67.5:
+                    featureBins.get('bin7').append(Mxy)
+                    gradientMagnitude['bin7'] += Mxy
+                else:
+                    featureBins.get('bin8').append(Mxy)
+                    gradientMagnitude['bin8'] += Mxy
+    for key, value in featureBins.items():
+        featureBins[key] = np.clip((featureBins.get(
+            key) / gradientMagnitude.get(key)), 0, 0.2)/gradientMagnitude.get(key)
+    return featureBins
+
+
+def computeBOWRepr(features, means):
+    bow_repr = np.array(means.shape[0])
 
 
 if __name__ == "__main__":
+
     i = loadImages()
     location_points, scores, Ixx, Iyy = extract_keypoints(cv2.imread(
         os.path.abspath(os.path.join(i.imagesHybridazation, i.imagesHybridazationVector[0]))))
-    compute_features(location_points, scores, Ixx, Iyy, cv2.imread(
+    features = compute_features(location_points, scores, Ixx, Iyy, cv2.imread(
         os.path.abspath(os.path.join(i.imagesHybridazation, i.imagesHybridazationVector[0]))))
+    computeBOWRepr(features, loadmat(os.path.abspath(
+        os.path.join(i.clusters, 'means.mat')))['means'])
