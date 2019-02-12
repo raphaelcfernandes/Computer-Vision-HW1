@@ -44,9 +44,9 @@ def part1():
 
 
 def computeTextureReprs(image, F):
-    k = loadImages()
     img = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    img = cv2.resize(img, (100, 100))
+    # if img.shape != (100, 100):
+    # img = cv2.resize(img, (100, 100))
     responses = np.ndarray(shape=(F.shape[2], img.shape[0], img.shape[1]))
     for i in range(F.shape[2]):
         img2 = ndimage.convolve(img, F[:, :, i])
@@ -64,8 +64,8 @@ def part3(im1, im2):
     img1 = cv2.resize(img1, (512, 512))
     img2 = cv2.imread(im2, 0)
     img2 = cv2.resize(img2, (512, 512))
-    im1_blur = gaussian_filter(img1, sigma=20)
-    im2_blur = gaussian_filter(img2, sigma=1)
+    im1_blur = gaussian_filter(img1, sigma=30)
+    im2_blur = gaussian_filter(img2, sigma=2)
     im2_detail = img2 - im2_blur
     hybrid = im1_blur + im2_detail
     cv2.imshow('image', hybrid)
@@ -97,11 +97,6 @@ def extract_keypoints(img):
     pixel_offset = int(window_size / 2)
     location_points = []
     scores = []
-    # OpenCV loads height X width. Y x X
-    # The foor loop should iterate over Y then over X
-    # Det 2x2: (A11 * A22) - (A12 * A21)
-    # Trace of a NxN matrix: sum of all elements in the main diagonal
-    # R = det(M) - k(trace(M)^2)
     for y in range(pixel_offset, image.shape[0] - pixel_offset):
         for x in range(pixel_offset, image.shape[1] - pixel_offset):
             M = np.zeros((2, 2))
@@ -122,17 +117,16 @@ def extract_keypoints(img):
             if check(R, y, x):
                 location_points.append((y, x))
                 scores.append((R[y, x], (y, x)))
-                img.itemset((y, x, 0), 255)
+                img.itemset((y, x, 0), 0)
                 img.itemset((y, x, 1), 0)
-                img.itemset((y, x, 2), 0)
+                img.itemset((y, x, 2), 255)
     sortedScores = sorted(scores, key=itemgetter(0))
-    # r = 1
-    # for i in sortedScores:
-    #     cv2.circle(img, (i[1][1], i[1][0]), r, (0, 0, 255))
-    #     r += 1
-    # cv2.imshow('image', img)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
+    for i in sortedScores:
+        cv2.circle(img, (i[1][1], i[1][0]),
+                   int(i[0]/sortedScores[-1][0]*100), (0, 0, 255))
+    cv2.imshow('image', img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
     return location_points, scores, dx, dy
 
 
@@ -143,66 +137,83 @@ def detectFeatureKeypoint(x, y, Xmax, Ymax):
 
 
 def compute_features(location_points, scores, Ix, Iy, image):
-    features = []
     image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     # (y,x)
     features = [(x, y) for x, y in location_points if detectFeatureKeypoint(
         y, x, image.shape[1], image.shape[0])]
-    featureBins = {'bin1': [], 'bin2': [], 'bin3': [],
-                   'bin4': [], 'bin5': [], 'bin6': [], 'bin7': [], 'bin8': []}
-    gradientMagnitude = {'bin1': 0, 'bin2': 0, 'bin3': 0,
-                         'bin4': 0, 'bin5': 0, 'bin6': 0, 'bin7': 0, 'bin8': 0}
-    for f in features:
+    featureBins = np.zeros((len(features), 8))
+    for index, f in enumerate(features):
         y, x = f
         for i in range(-5, 6, 1):
             for j in range(-5, 6, 1):
-                Mxy = np.sqrt(Ix[y + i, x + j + 1] ** 2 +
-                              Iy[y + i, x + j + 1] ** 2)
-                if not Iy[y + i, x + j + 1] == 0:
+                Mxy = np.sqrt(Ix[y + i, x + j] ** 2 +
+                              Iy[y + i, x + j] ** 2)
+                if not Iy[y + i, x + j] == 0:
                     k = math.degrees(
-                        math.atan(Ix[y + i, x + j + 1] / Iy[y + i, x + j + 1]))
+                        math.atan(Ix[y + i, x + j] / Iy[y + i, x + j]))
                 else:
                     k = 0
                 if k >= -90 and k < -67.5:
-                    featureBins.get('bin1').append(Mxy)
-                    gradientMagnitude['bin1'] += Mxy
+                    featureBins[index][0] += Mxy
                 elif k >= -67.5 and k < -45:
-                    featureBins.get('bin2').append(Mxy)
-                    gradientMagnitude['bin2'] += Mxy
+                    featureBins[index][1] += Mxy
                 elif k >= -45 and k < -22.5:
-                    featureBins.get('bin3').append(Mxy)
-                    gradientMagnitude['bin3'] += Mxy
+                    featureBins[index][2] += Mxy
                 elif k >= -22.5 and k < 0:
-                    featureBins.get('bin4').append(Mxy)
-                    gradientMagnitude['bin4'] += Mxy
+                    featureBins[index][3] += Mxy
                 elif k >= 0 and k < 22.5:
-                    featureBins.get('bin5').append(Mxy)
-                    gradientMagnitude['bin5'] += Mxy
+                    featureBins[index][4] += Mxy
                 elif k >= 22.5 and k < 45:
-                    featureBins.get('bin6').append(Mxy)
-                    gradientMagnitude['bin6'] += Mxy
+                    featureBins[index][5] += Mxy
                 elif k >= 45 and k < 67.5:
-                    featureBins.get('bin7').append(Mxy)
-                    gradientMagnitude['bin7'] += Mxy
+                    featureBins[index][6] += Mxy
                 else:
-                    featureBins.get('bin8').append(Mxy)
-                    gradientMagnitude['bin8'] += Mxy
-    for key, value in featureBins.items():
-        featureBins[key] = np.clip((featureBins.get(
-            key) / gradientMagnitude.get(key)), 0, 0.2)/gradientMagnitude.get(key)
+                    featureBins[index][7] += Mxy
+    for row, col in enumerate(featureBins):
+        featureBins[row] = np.clip(
+            featureBins[row] / np.sum(featureBins[row]), 0, 0.2) / np.sum(featureBins[row])
     return featureBins
 
 
 def computeBOWRepr(features, means):
-    bow_repr = np.array(means.shape[0])
+    bow_repr = np.zeros(means.shape[0])
+    closenessMap = np.zeros(features.shape[0])
+    for row, cols in enumerate(features):
+        max = np.inf
+        for index, i in enumerate(means):
+            v = np.sqrt(np.sum(cols - i) ** 2)
+            if v < max:
+                max = v
+                cluster = index
+        closenessMap[row] = cluster
+        bow_repr[cluster] += 1
+    bow_repr = bow_repr/np.sum(bow_repr)
+    return bow_repr
+
+
+def part7(loadI):
+    imageRepresentations = {}
+    for i in loadI.imagesVector:
+        image = cv2.resize(cv2.imread(os.path.abspath(
+            os.path.join(loadI.imagesPath, i))), (100, 100))
+        location_points, scores, Ix, Iy = extract_keypoints(image)
+        features = compute_features(location_points, scores, Ix, Iy, image)
+        bow_repr = computeBOWRepr(features, loadmat(
+            os.path.abspath(os.path.join(loadI.clusters, 'means.mat')))['means'])
+        texture_repr_concat, texture_repr_mean = computeTextureReprs(image, loadmat(
+            os.path.abspath(os.path.join(loadI.filters, 'leung_malik_filter.mat')))['F'])
 
 
 if __name__ == "__main__":
-
     i = loadImages()
     location_points, scores, Ixx, Iyy = extract_keypoints(cv2.imread(
-        os.path.abspath(os.path.join(i.imagesHybridazation, i.imagesHybridazationVector[0]))))
-    features = compute_features(location_points, scores, Ixx, Iyy, cv2.imread(
-        os.path.abspath(os.path.join(i.imagesHybridazation, i.imagesHybridazationVector[0]))))
-    computeBOWRepr(features, loadmat(os.path.abspath(
-        os.path.join(i.clusters, 'means.mat')))['means'])
+        os.path.abspath(os.path.join(i.imagesPath, i.imagesVector[2]))))
+    # features = compute_features(location_points, scores, Ixx, Iyy, cv2.imread(
+    #     os.path.abspath(os.path.join(i.imagesHybridazation, i.imagesHybridazationVector[0]))))
+    # computeBOWRepr(features, loadmat(os.path.abspath(
+    #     os.path.join(i.clusters, 'means.mat')))['means'])
+    # part7(i)
+    # part3(os.path.abspath(os.path.join(i.imagesHybridazation, i.imagesHybridazationVector[0])), os.path.abspath(
+    # os.path.join(i.imagesHybridazation, i.imagesHybridazationVector[1])))
+    # computeTextureReprs(cv2.imread(os.path.abspath(os.path.join(i.imagesPath, i.imagesVector[0]))), loadmat(
+    # os.path.abspath(os.path.join(i.filters, 'leung_malik_filter.mat')))['F'])
