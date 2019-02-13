@@ -1,0 +1,7 @@
+Bag of words ratio:  1.3991487678233288
+Texture concatenated ratio:  0.9895219287030381
+Texture mean ratio:  0.6322288477738662
+
+The smallest within-between ratio is texture mean ratio
+
+I was expecting bag of words to be the lowest one given the fact that it describes what features some images have in common

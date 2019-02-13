@@ -121,75 +121,52 @@ def extract_keypoints(img):
                 scores.append((R[y, x], (y, x)))
             else:
                 R[y, x] = 0
-    # R = cv2.dilate(R, None)
-    # img[R != 0] = [255, 0, 255]
-    # sortedScores = sorted(scores, key=itemgetter(0))
-    # for i in sortedScores:
-    #     cv2.circle(img, (i[1][1], i[1][0]), int(
-    #         i[0]/sortedScores[-1][0]*50), (0, 0, 255))
-    # cv2.imshow('img', img)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
+    R = cv2.dilate(R, None)
+    img[R != 0] = [255, 0, 255]
+    sortedScores = sorted(scores, key=itemgetter(0))
+    for i in sortedScores:
+        cv2.circle(img, (i[1][1], i[1][0]), int(
+            i[0]/sortedScores[-1][0]*50), (0, 0, 255))
+    cv2.imshow('img', img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
     return location_points, scores, dx, dy
 
 
-def detectFeatureKeypoint(x, y, Xmax, Ymax):
-    if x - 5 >= 0 and x + 5 < Xmax and y - 5 >= 0 and y + 5 < Ymax:
-        return True
-    return False
-
-
-def compute_features(location_points, scores, Ix, Iy, image):
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    # (y,x)
-    features = [(x, y) for x, y in location_points if detectFeatureKeypoint(
-        y, x, image.shape[1], image.shape[0])]
-    featureBins = np.zeros((len(features), 8))
-    for index, f in enumerate(features):
-        y, x = f
-        for i in range(-5, 6, 1):
-            for j in range(-5, 6, 1):
-                Mxy = np.sqrt(Ix[y + i, x + j] ** 2 +
-                              Iy[y + i, x + j] ** 2)
-                if not Iy[y + i, x + j] == 0:
-                    k = math.degrees(
-                        math.atan(Ix[y + i, x + j] / Iy[y + i, x + j]))
-                else:
-                    k = 0
-                if k >= -90 and k < -67.5:
-                    featureBins[index][0] += Mxy
-                elif k >= -67.5 and k < -45:
-                    featureBins[index][1] += Mxy
-                elif k >= -45 and k < -22.5:
-                    featureBins[index][2] += Mxy
-                elif k >= -22.5 and k < 0:
-                    featureBins[index][3] += Mxy
-                elif k >= 0 and k < 22.5:
-                    featureBins[index][4] += Mxy
-                elif k >= 22.5 and k < 45:
-                    featureBins[index][5] += Mxy
-                elif k >= 45 and k < 67.5:
-                    featureBins[index][6] += Mxy
-                else:
-                    featureBins[index][7] += Mxy
-    for row, col in enumerate(featureBins):
-        featureBins[row] = np.clip(
-            featureBins[row] / np.sum(featureBins[row]), 0, 0.2) / np.sum(featureBins[row])
+def compute_features(location_points, scores, Ix, Iy):
+    offset = 5
+    featureBins = np.zeros((len(location_points), 8))
+    for i, f in enumerate(location_points):
+        x, y = f
+        if not (x - offset < 0 or x + offset + 1 > (Ix.shape[0] - 1) or y - offset < 0 or y + offset+1 > (Iy.shape[0] - 1)):
+            tMatrix = np.zeros((11, 11))
+            Mxy = np.sqrt(np.power(Ix[x - offset:x + offset+1, y - offset:y + offset+1],
+                                   2) + np.power(Iy[x - offset:x + offset+1, y - offset: y + offset+1], 2))
+            MxyN0 = np.where(Mxy != 0)
+            index = (MxyN0[0] + x - offset, MxyN0[1] + y - offset)
+            tMatrix[MxyN0] = np.degrees(np.arctan(Iy[index], Ix[index]))
+            theta_class = np.digitize(tMatrix, np.arange(-90, 90, 180 / 8)) - 1
+            for j in range(8):
+                featureBins[i][j] = np.sum(Mxy[theta_class == j])
+            if np.max(featureBins[i]) - np.min(featureBins[i]) != 0:
+                featureBins[i] = (
+                    featureBins[i] - np.min(featureBins[i])) / np.max(featureBins[i]) - np.min(featureBins[i])
+                featureBins = np.clip(featureBins, 0, 0.2)
+                featureBins[i] = (
+                    featureBins[i] - np.min(featureBins[i])) / np.max(featureBins[i]) - np.min(featureBins[i])
     return featureBins
 
 
 def computeBOWRepr(features, means):
-    import pdb
     bow_repr = np.zeros(means.shape[0])
     for row, cols in enumerate(features):
-        max = np.inf
+        maxV = np.inf
         for index, i in enumerate(means):
             v = np.linalg.norm(cols - i, 2, 0)
-            if v < max:
-                max = v
+            if v < maxV:
+                maxV = v
                 cluster = index
         bow_repr[cluster] += 1
-
     bow_repr = bow_repr / np.sum(bow_repr)
     return bow_repr
 
@@ -197,39 +174,61 @@ def computeBOWRepr(features, means):
 def part7(loadI):
     imageRepresentations = {}
     cont = 0
+    bow_repr_vector = []
+    texture_repr_concat_vector = []
+    texture_repr_mean_vector = []
     for i in loadI.imagesVector:
         image = cv2.resize(cv2.imread(os.path.abspath(
             os.path.join(loadI.imagesPath, i))), (100, 100))
         location_points, scores, Ix, Iy = extract_keypoints(image)
-        features = compute_features(location_points, scores, Ix, Iy, image)
-        bow_repr = computeBOWRepr(features, loadmat(
-            os.path.abspath(os.path.join(loadI.clusters, 'means.mat')))['means'])
+        features = compute_features(location_points, scores, Ix, Iy)
+        bow_repr = computeBOWRepr(features, loadmat(os.path.abspath(
+            os.path.join(loadI.clusters, 'means.mat')))['means'])
         texture_repr_concat, texture_repr_mean = computeTextureReprs(image, loadmat(
             os.path.abspath(os.path.join(loadI.filters, 'leung_malik_filter.mat')))['F'])
-        imageRepresentations.update({i.split('.')[0]: {
-                                    'bow_repr': bow_repr, 'texture_repr_concat': texture_repr_concat, 'texture_repr_mean': texture_repr_mean}})
-    # Ratio within class
-    # ratioWithinClass = {}
-    # ratioWithinClass.update({'cardinal': {'bow_repr': np.sqrt(np.sum(imageRepresentations.get('cardinal1').get('bow_repr') - imageRepresentations.get('cardinal2').get('bow_repr')) ** 2),
-    #                                       'texture_repr_concat': np.sqrt(np.sum(imageRepresentations.get('cardinal1').get(
-    #                                           'texture_repr_concat') - imageRepresentations.get('cardinal2').get('texture_repr_concat')) ** 2),
-    #                                       'texture_repr_mean': np.sqrt(np.sum(imageRepresentations.get('cardinal1').get('texture_repr_mean') - imageRepresentations.get('cardinal2').get('texture_repr_mean'))**2)}})
-    # print(np.sum(imageRepresentations.get('cardinal1').get('bow_repr') - imageRepresentations.get('cardinal2').get('bow_repr')) ** 2)
-    x = imageRepresentations.get('cardinal2').get('texture_repr_mean')
-    y = imageRepresentations.get('leopard1').get('texture_repr_mean')
-    print(np.linalg.norm(x - y, 2, 0))
+        bow_repr_vector.append(bow_repr)
+        texture_repr_concat_vector.append(texture_repr_concat)
+        texture_repr_mean_vector.append(texture_repr_mean)
+
+    # Within class calculation
+    bow_repr_within = []
+    texture_repr_concat_within = []
+    texture_repr_mean_within = []
+    for i in range(0, 6, 2):
+        bow_repr_within.append(np.linalg.norm(
+            bow_repr_vector[i] - bow_repr_vector[i + 1], 2, 0))
+        texture_repr_concat_within.append(np.linalg.norm(
+            texture_repr_concat_vector[i] - texture_repr_concat_vector[i + 1], 2, 0))
+        texture_repr_mean_within.append(np.linalg.norm(
+            texture_repr_mean_vector[i] - texture_repr_mean_vector[i + 1], 2, 0))
+    # between class calculation
+    bow_repr_between = []
+    texture_repr_concat_between = []
+    texture_repr_mean_between = []
+    for class1 in range(0, 6):
+        for class2 in range(class1 + 2 if class1 % 2 == 0 else class1 + 1, 6):
+            bow_repr_between.append(np.linalg.norm(
+                bow_repr_vector[class1] - bow_repr_vector[class2], 2, 0))
+            texture_repr_concat_between.append(np.linalg.norm(
+                texture_repr_concat_vector[class1] - texture_repr_concat_vector[class2], 2, 0))
+            texture_repr_mean_between.append(np.linalg.norm(
+                texture_repr_mean_vector[class1] - texture_repr_mean_vector[class2], 2, 0))
+
+    print("Bag of words ratio: ", np.average(
+        bow_repr_within) / np.average(bow_repr_between))
+    print("Texture concatenated ratio: ", np.average(
+        texture_repr_concat_within) / np.average(texture_repr_concat_between))
+    print("Texture mean ratio: ", np.average(
+        texture_repr_mean_within) / np.average(texture_repr_mean_between))
 
 
 if __name__ == "__main__":
     i = loadImages()
-    location_points, scores, Ixx, Iyy = extract_keypoints(cv2.imread(
-        os.path.abspath(os.path.join(i.imagesPath, i.imagesVector[2]))))
-    # features = compute_features(location_points, scores, Ixx, Iyy, cv2.imread(
-    #     os.path.abspath(os.path.join(i.imagesPath, i.imagesVector[0]))))
-    # computeBOWRepr(features, loadmat(os.path.abspath(
-    #     os.path.join(i.clusters, 'means.mat')))['means'])
-    # part7(i)
-    # part3(os.path.abspath(os.path.join(i.imagesHybridazation, i.imagesHybridazationVector[2])), os.path.abspath(
-    #     os.path.join(i.imagesHybridazation, i.imagesHybridazationVector[3])))
+
     # computeTextureReprs(cv2.imread(os.path.abspath(os.path.join(i.imagesPath, i.imagesVector[0]))), loadmat(
     # os.path.abspath(os.path.join(i.filters, 'leung_malik_filter.mat')))['F'])
+    # location_points, scores, Ixx, Iyy = extract_keypoints(cv2.imread(
+    #     os.path.abspath(os.path.join(i.imagesPath, i.imagesVector[5]))))
+    # part3(os.path.abspath(os.path.join(i.imagesHybridazation, i.imagesHybridazationVector[0])), os.path.abspath(
+    #     os.path.join(i.imagesHybridazation, i.imagesHybridazationVector[1])))
+    # part7(i)
