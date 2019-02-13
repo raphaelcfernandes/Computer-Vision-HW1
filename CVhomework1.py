@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from loadImages import loadImages
 from operator import itemgetter
 import math
+import time
 
 
 def part1():
@@ -56,7 +57,7 @@ def computeTextureReprs(image, F):
     texture_repr_mean = []
     for i in range(F.shape[2]):
         texture_repr_mean.append(np.mean(responses[i]))
-    return texture_repr_concat, texture_repr_mean
+    return texture_repr_concat, np.asarray(texture_repr_mean)
 
 
 def part3(im1, im2):
@@ -93,6 +94,7 @@ def extract_keypoints(img):
     dy = cv2.Sobel(image, cv2.CV_64F, 0, 1)
     Ixx = dx**2
     Iyy = dy**2
+    Ixy = dx*dy
     R = np.zeros((image.shape[0], image.shape[1]))
     pixel_offset = int(window_size / 2)
     location_points = []
@@ -102,8 +104,8 @@ def extract_keypoints(img):
             M = np.zeros((2, 2))
             M[0, 0] = np.sum(Ixx[y - pixel_offset:y + pixel_offset +
                                  1, x - pixel_offset:x + pixel_offset + 1])
-            M[0, 1] = np.sum(dx[y - pixel_offset:y + pixel_offset + 1, x - pixel_offset:x + pixel_offset + 1]
-                             * dy[y - pixel_offset:y + pixel_offset + 1, x - pixel_offset:x + pixel_offset + 1])
+            M[0, 1] = np.sum(Ixy[y - pixel_offset:y + pixel_offset +
+                                 1, x - pixel_offset:x + pixel_offset + 1])
             M[1, 0] = M[0, 1]
             M[1, 1] = np.sum(Iyy[y - pixel_offset:y + pixel_offset +
                                  1, x - pixel_offset:x + pixel_offset + 1])
@@ -117,16 +119,17 @@ def extract_keypoints(img):
             if check(R, y, x):
                 location_points.append((y, x))
                 scores.append((R[y, x], (y, x)))
-                img.itemset((y, x, 0), 0)
-                img.itemset((y, x, 1), 0)
-                img.itemset((y, x, 2), 255)
-    sortedScores = sorted(scores, key=itemgetter(0))
-    for i in sortedScores:
-        cv2.circle(img, (i[1][1], i[1][0]),
-                   int(i[0]/sortedScores[-1][0]*100), (0, 0, 255))
-    cv2.imshow('image', img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+            else:
+                R[y, x] = 0
+    # R = cv2.dilate(R, None)
+    # img[R != 0] = [255, 0, 255]
+    # sortedScores = sorted(scores, key=itemgetter(0))
+    # for i in sortedScores:
+    #     cv2.circle(img, (i[1][1], i[1][0]), int(
+    #         i[0]/sortedScores[-1][0]*50), (0, 0, 255))
+    # cv2.imshow('img', img)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
     return location_points, scores, dx, dy
 
 
@@ -176,23 +179,24 @@ def compute_features(location_points, scores, Ix, Iy, image):
 
 
 def computeBOWRepr(features, means):
+    import pdb
     bow_repr = np.zeros(means.shape[0])
-    closenessMap = np.zeros(features.shape[0])
     for row, cols in enumerate(features):
         max = np.inf
         for index, i in enumerate(means):
-            v = np.sqrt(np.sum(cols - i) ** 2)
+            v = np.linalg.norm(cols - i, 2, 0)
             if v < max:
                 max = v
                 cluster = index
-        closenessMap[row] = cluster
         bow_repr[cluster] += 1
-    bow_repr = bow_repr/np.sum(bow_repr)
+
+    bow_repr = bow_repr / np.sum(bow_repr)
     return bow_repr
 
 
 def part7(loadI):
     imageRepresentations = {}
+    cont = 0
     for i in loadI.imagesVector:
         image = cv2.resize(cv2.imread(os.path.abspath(
             os.path.join(loadI.imagesPath, i))), (100, 100))
@@ -202,6 +206,18 @@ def part7(loadI):
             os.path.abspath(os.path.join(loadI.clusters, 'means.mat')))['means'])
         texture_repr_concat, texture_repr_mean = computeTextureReprs(image, loadmat(
             os.path.abspath(os.path.join(loadI.filters, 'leung_malik_filter.mat')))['F'])
+        imageRepresentations.update({i.split('.')[0]: {
+                                    'bow_repr': bow_repr, 'texture_repr_concat': texture_repr_concat, 'texture_repr_mean': texture_repr_mean}})
+    # Ratio within class
+    # ratioWithinClass = {}
+    # ratioWithinClass.update({'cardinal': {'bow_repr': np.sqrt(np.sum(imageRepresentations.get('cardinal1').get('bow_repr') - imageRepresentations.get('cardinal2').get('bow_repr')) ** 2),
+    #                                       'texture_repr_concat': np.sqrt(np.sum(imageRepresentations.get('cardinal1').get(
+    #                                           'texture_repr_concat') - imageRepresentations.get('cardinal2').get('texture_repr_concat')) ** 2),
+    #                                       'texture_repr_mean': np.sqrt(np.sum(imageRepresentations.get('cardinal1').get('texture_repr_mean') - imageRepresentations.get('cardinal2').get('texture_repr_mean'))**2)}})
+    # print(np.sum(imageRepresentations.get('cardinal1').get('bow_repr') - imageRepresentations.get('cardinal2').get('bow_repr')) ** 2)
+    x = imageRepresentations.get('cardinal2').get('texture_repr_mean')
+    y = imageRepresentations.get('leopard1').get('texture_repr_mean')
+    print(np.linalg.norm(x - y, 2, 0))
 
 
 if __name__ == "__main__":
@@ -209,11 +225,11 @@ if __name__ == "__main__":
     location_points, scores, Ixx, Iyy = extract_keypoints(cv2.imread(
         os.path.abspath(os.path.join(i.imagesPath, i.imagesVector[2]))))
     # features = compute_features(location_points, scores, Ixx, Iyy, cv2.imread(
-    #     os.path.abspath(os.path.join(i.imagesHybridazation, i.imagesHybridazationVector[0]))))
+    #     os.path.abspath(os.path.join(i.imagesPath, i.imagesVector[0]))))
     # computeBOWRepr(features, loadmat(os.path.abspath(
     #     os.path.join(i.clusters, 'means.mat')))['means'])
     # part7(i)
-    # part3(os.path.abspath(os.path.join(i.imagesHybridazation, i.imagesHybridazationVector[0])), os.path.abspath(
-    # os.path.join(i.imagesHybridazation, i.imagesHybridazationVector[1])))
+    # part3(os.path.abspath(os.path.join(i.imagesHybridazation, i.imagesHybridazationVector[2])), os.path.abspath(
+    #     os.path.join(i.imagesHybridazation, i.imagesHybridazationVector[3])))
     # computeTextureReprs(cv2.imread(os.path.abspath(os.path.join(i.imagesPath, i.imagesVector[0]))), loadmat(
     # os.path.abspath(os.path.join(i.filters, 'leung_malik_filter.mat')))['F'])
